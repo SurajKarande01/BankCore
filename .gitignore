@@ -31,3 +31,7 @@ target/
 ### OS ###
 .DS_Store
 Thumbs.db
+
+### Agents & Skills ###
+.agents/
+.agent/
