@@ -1,37 +1,116 @@
+# =========================================================================
+# Professional .gitignore for Spring Boot 3 & Java 17 Projects (BankCore)
+# =========================================================================
+
+# -------------------------------------------------------------------------
+# Maven & Build Output
+# -------------------------------------------------------------------------
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/.maven-wrapper.jar
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
+# -------------------------------------------------------------------------
+# JVM Dumps & Crash Logs
+# -------------------------------------------------------------------------
+*.hprof
+hs_err_pid*
+replay_pid*
 
-### IntelliJ IDEA ###
-.idea
+# -------------------------------------------------------------------------
+# Runtime Logs & Temporary Files
+# -------------------------------------------------------------------------
+*.log
+logs/
+*.tmp
+*.temp
+*.swp
+*~
+
+# -------------------------------------------------------------------------
+# Local Databases & In-Memory Storage
+# -------------------------------------------------------------------------
+*.db
+*.h2.db
+bankcoredb.*
+*.sqlite
+
+# -------------------------------------------------------------------------
+# Environment & Sensitive Credentials
+# -------------------------------------------------------------------------
+.env
+.env.local
+*.pem
+*.key
+application-local.properties
+application-local.yml
+
+# -------------------------------------------------------------------------
+# IntelliJ IDEA
+# -------------------------------------------------------------------------
+.idea/
 *.iws
 *.iml
 *.ipr
+out/
+.idea_modules/
 
-### NetBeans ###
+# -------------------------------------------------------------------------
+# Eclipse & Spring Tool Suite (STS)
+# -------------------------------------------------------------------------
+.apt_generated
+.apt_generated_tests
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+bin/
+
+# -------------------------------------------------------------------------
+# Visual Studio Code
+# -------------------------------------------------------------------------
+.vscode/
+*.code-workspace
+
+# -------------------------------------------------------------------------
+# NetBeans
+# -------------------------------------------------------------------------
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbproject/load-impl.xml
 /nbproject/build-impl.xml
 
-### VS Code ###
-.vscode/
-
-### OS ###
+# -------------------------------------------------------------------------
+# Operating System Files
+# -------------------------------------------------------------------------
+# macOS
 .DS_Store
-Thumbs.db
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
 
-### Agents & Skills ###
-.agents/
-.agent/
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
