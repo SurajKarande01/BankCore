@@ -15,10 +15,7 @@ public interface TransactionRepository extends JpaRepository<TransactionRecord, 
 
     Optional<TransactionRecord> findByTransactionReference(String transactionReference);
 
-    /**
-     * Finds all transactions involving the given account within a specific date range,
-     * ordered chronologically for monthly statement generation.
-     */
+    // Ordered chronologically for statement reconciliation
     @Query("SELECT t FROM TransactionRecord t WHERE (t.sourceAccountId = :accountId OR t.destinationAccountId = :accountId) " +
            "AND t.createdAt >= :startDate AND t.createdAt <= :endDate ORDER BY t.createdAt ASC")
     List<TransactionRecord> findStatementTransactions(
@@ -27,9 +24,7 @@ public interface TransactionRepository extends JpaRepository<TransactionRecord, 
             @Param("endDate") LocalDateTime endDate
     );
 
-    /**
-     * Finds recent transactions for an account ordered newest to oldest.
-     */
+    // Latest transactions first
     @Query("SELECT t FROM TransactionRecord t WHERE t.sourceAccountId = :accountId OR t.destinationAccountId = :accountId " +
            "ORDER BY t.createdAt DESC")
     List<TransactionRecord> findRecentTransactions(@Param("accountId") Long accountId);

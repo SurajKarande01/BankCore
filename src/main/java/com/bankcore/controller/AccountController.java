@@ -45,8 +45,12 @@ public class AccountController {
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String direction
     ) {
-        Sort sort = direction.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
-        Page<AccountResponse> accounts = accountService.getAllAccounts(PageRequest.of(page, size, sort));
+        // Enforce safe paging bounds to prevent resource exhaustion
+        int safePage = Math.max(0, page);
+        int safeSize = (size <= 0 || size > 100) ? 10 : size;
+        Sort sort = "asc".equalsIgnoreCase(direction) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Page<AccountResponse> accounts = accountService.getAllAccounts(PageRequest.of(safePage, safeSize, sort));
         return ResponseEntity.ok(ApiResponse.ok("Accounts retrieved", accounts));
     }
 }
+

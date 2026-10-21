@@ -26,7 +26,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,20 +36,17 @@ public class TransactionServiceImpl implements TransactionService {
     private final TransactionRepository transactionRepository;
     private final AuditService auditService;
 
-    /**
-     * Executes an ACID-compliant fund transfer between two bank accounts.
-     * 
-     * Key Concurrency & Transactional Guarantees:
-     * 1. Spring @Transactional(rollbackFor = Exception.class) guarantees all-or-nothing atomicity.
-     *    A failure midway completely rolls back the transaction — zero partial debits.
-     * 2. Pessimistic Write Locking (@Lock(PESSIMISTIC_WRITE) / SELECT FOR UPDATE) serializes
-     *    concurrent balance updates on the same accounts, eliminating the Lost Update problem.
-     * 3. Deterministic Lock Ordering: Locks are acquired in ascending order of Account Primary Key (ID).
-     *    This mathematically prevents cyclic wait / database deadlocks during bidirectional transfers.
-     */
     @Override
     @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
     public TransactionResponse transferFunds(FundTransferRequest request) {
+        if (request == null) {
+            throw new InvalidTransactionException("Transfer request cannot be null");
+        }
+
+        if (request.getSourceAccountNumber() == null || request.getDestinationAccountNumber() == null) {
+            throw new InvalidTransactionException("Source and destination account numbers are required");
+        }
+
         String sourceAccNum = request.getSourceAccountNumber().trim();
         String destAccNum = request.getDestinationAccountNumber().trim();
         BigDecimal amount = request.getAmount();
@@ -63,29 +59,23 @@ public class TransactionServiceImpl implements TransactionService {
             throw new InvalidTransactionException("Transfer amount must be strictly greater than zero");
         }
 
-        // 1. Fetch uncommitted account entities to retrieve their Primary Keys
-        Account rawSource = accountRepository.findByAccountNumber(sourceAccNum)
+        Long sourceId = accountRepository.findIdByAccountNumber(sourceAccNum)
                 .orElseThrow(() -> AccountNotFoundException.forAccountNumber(sourceAccNum));
-        Account rawDest = accountRepository.findByAccountNumber(destAccNum)
+        Long destId = accountRepository.findIdByAccountNumber(destAccNum)
                 .orElseThrow(() -> AccountNotFoundException.forAccountNumber(destAccNum));
 
-        // 2. Deadlock Prevention via Deterministic Lock Ordering
-        // Always acquire locks in ascending order of Account ID: min(id) first, then max(id)
-        Long firstLockId = Math.min(rawSource.getId(), rawDest.getId());
-        Long secondLockId = Math.max(rawSource.getId(), rawDest.getId());
+        // Always lock lower ID first to prevent deadlocks across concurrent transfers
+        Long firstLockId = Math.min(sourceId, destId);
+        Long secondLockId = Math.max(sourceId, destId);
 
-        accountRepository.findByIdForUpdate(firstLockId)
+        Account firstLocked = accountRepository.findByIdForUpdate(firstLockId)
                 .orElseThrow(() -> AccountNotFoundException.forId(firstLockId));
-        accountRepository.findByIdForUpdate(secondLockId)
+        Account secondLocked = accountRepository.findByIdForUpdate(secondLockId)
                 .orElseThrow(() -> AccountNotFoundException.forId(secondLockId));
 
-        // 3. Re-read the locked instances with row-level locks engaged
-        Account sourceAccount = accountRepository.findById(rawSource.getId())
-                .orElseThrow(() -> AccountNotFoundException.forId(rawSource.getId()));
-        Account destAccount = accountRepository.findById(rawDest.getId())
-                .orElseThrow(() -> AccountNotFoundException.forId(rawDest.getId()));
+        Account sourceAccount = sourceId.equals(firstLockId) ? firstLocked : secondLocked;
+        Account destAccount = destId.equals(firstLockId) ? firstLocked : secondLocked;
 
-        // 4. Validate account status
         if (sourceAccount.getStatus() != AccountStatus.ACTIVE) {
             throw new AccountInactiveException("Source account " + sourceAccNum + " is not ACTIVE. Current status: " + sourceAccount.getStatus());
         }
@@ -93,15 +83,12 @@ public class TransactionServiceImpl implements TransactionService {
             throw new AccountInactiveException("Destination account " + destAccNum + " is not ACTIVE. Current status: " + destAccount.getStatus());
         }
 
-        // 5. Debit sender (throws InsufficientBalanceException if balance is inadequate, causing rollback)
         sourceAccount.debit(amount);
-        // 6. Credit receiver
         destAccount.credit(amount);
 
         accountRepository.save(sourceAccount);
         accountRepository.save(destAccount);
 
-        // 7. Generate unique transaction reference and record in ledger
         String txnRef = "TXN-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
         TransactionRecord txnRecord = TransactionRecord.builder()
                 .transactionReference(txnRef)
@@ -113,7 +100,7 @@ public class TransactionServiceImpl implements TransactionService {
                 .transactionType(TransactionType.TRANSFER)
                 .status(TransactionStatus.SUCCESS)
                 .description(request.getDescription() != null ? request.getDescription() : "Fund Transfer")
-                .initiatedBy(request.getInitiatedBy())
+                .initiatedBy(request.getInitiatedBy() != null ? request.getInitiatedBy() : "SYSTEM")
                 .sourceBalanceAfter(sourceAccount.getBalance())
                 .destinationBalanceAfter(destAccount.getBalance())
                 .createdAt(LocalDateTime.now())
@@ -121,7 +108,6 @@ public class TransactionServiceImpl implements TransactionService {
 
         TransactionRecord savedTxn = transactionRepository.save(txnRecord);
 
-        // 8. Log audit trail (who triggered it, debit amount, credit amount)
         auditService.log(
                 "TRANSACTION",
                 savedTxn.getId(),
@@ -139,6 +125,10 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
     public TransactionResponse deposit(DepositRequest request) {
+        if (request == null || request.getAccountNumber() == null) {
+            throw new InvalidTransactionException("Account number is required for deposit");
+        }
+
         String accNum = request.getAccountNumber().trim();
         BigDecimal amount = request.getAmount();
 
@@ -188,6 +178,10 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
     public TransactionResponse withdraw(WithdrawRequest request) {
+        if (request == null || request.getAccountNumber() == null) {
+            throw new InvalidTransactionException("Account number is required for withdrawal");
+        }
+
         String accNum = request.getAccountNumber().trim();
         BigDecimal amount = request.getAmount();
 
@@ -202,7 +196,7 @@ public class TransactionServiceImpl implements TransactionService {
             throw new AccountInactiveException("Account " + accNum + " is not ACTIVE");
         }
 
-        account.debit(amount); // Throws InsufficientBalanceException if balance is insufficient
+        account.debit(amount);
         accountRepository.save(account);
 
         String txnRef = "TXN-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
@@ -237,20 +231,29 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     @Transactional(readOnly = true)
     public TransactionResponse getTransactionByReference(String transactionReference) {
-        TransactionRecord txn = transactionRepository.findByTransactionReference(transactionReference)
-                .orElseThrow(() -> new InvalidTransactionException("Transaction not found for reference: " + transactionReference));
+        if (transactionReference == null || transactionReference.trim().isEmpty()) {
+            throw new InvalidTransactionException("Transaction reference is required");
+        }
+        String cleanRef = transactionReference.trim();
+        TransactionRecord txn = transactionRepository.findByTransactionReference(cleanRef)
+                .orElseThrow(() -> new InvalidTransactionException("Transaction not found for reference: " + cleanRef));
         return TransactionResponse.fromEntity(txn);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<TransactionResponse> getRecentTransactions(String accountNumber) {
-        Account account = accountRepository.findByAccountNumber(accountNumber)
-                .orElseThrow(() -> AccountNotFoundException.forAccountNumber(accountNumber));
+        if (accountNumber == null || accountNumber.trim().isEmpty()) {
+            throw new InvalidTransactionException("Account number is required");
+        }
+        String cleanAccNum = accountNumber.trim();
+        Account account = accountRepository.findByAccountNumber(cleanAccNum)
+                .orElseThrow(() -> AccountNotFoundException.forAccountNumber(cleanAccNum));
 
         return transactionRepository.findRecentTransactions(account.getId())
                 .stream()
                 .map(TransactionResponse::fromEntity)
-                .collect(Collectors.toList());
+                .toList();
     }
 }
+

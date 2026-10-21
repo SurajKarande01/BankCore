@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -24,20 +23,26 @@ public class AuditServiceImpl implements AuditService {
     @Override
     @Transactional(propagation = Propagation.REQUIRED)
     public void log(String entityName, Long entityId, String action, String triggeredBy, String details, String status, String ipAddress) {
+        String safeEntity = entityName != null ? entityName : "UNKNOWN";
+        String safeAction = action != null ? action : "UNKNOWN";
+        String actor = (triggeredBy != null && !triggeredBy.trim().isEmpty()) ? triggeredBy.trim() : "SYSTEM";
+        String logStatus = status != null ? status : "SUCCESS";
+        String ip = (ipAddress != null && !ipAddress.trim().isEmpty()) ? ipAddress.trim() : "127.0.0.1";
+
         AuditLog auditLog = AuditLog.builder()
-                .entityName(entityName)
+                .entityName(safeEntity)
                 .entityId(entityId)
-                .action(action)
-                .triggeredBy(triggeredBy != null ? triggeredBy : "SYSTEM")
+                .action(safeAction)
+                .triggeredBy(actor)
                 .details(details)
-                .status(status != null ? status : "SUCCESS")
-                .ipAddress(ipAddress != null ? ipAddress : "127.0.0.1")
+                .status(logStatus)
+                .ipAddress(ip)
                 .createdAt(LocalDateTime.now())
                 .build();
 
         auditLogRepository.save(auditLog);
         log.info("[AUDIT] Action: {} on Entity: {} (ID: {}) by Actor: '{}' - Status: {}",
-                action, entityName, entityId, triggeredBy, status);
+                safeAction, safeEntity, entityId, actor, logStatus);
     }
 
     @Override
@@ -46,16 +51,17 @@ public class AuditServiceImpl implements AuditService {
         return auditLogRepository.findByEntityNameAndEntityIdOrderByCreatedAtDesc(entityName, entityId)
                 .stream()
                 .map(AuditLogResponse::fromEntity)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<AuditLogResponse> getLogsByActor(String actor) {
-        return auditLogRepository.findByTriggeredByOrderByCreatedAtDesc(actor)
+        String cleanActor = actor != null ? actor.trim() : "";
+        return auditLogRepository.findByTriggeredByOrderByCreatedAtDesc(cleanActor)
                 .stream()
                 .map(AuditLogResponse::fromEntity)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
@@ -64,6 +70,7 @@ public class AuditServiceImpl implements AuditService {
         return auditLogRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
                 .map(AuditLogResponse::fromEntity)
-                .collect(Collectors.toList());
+                .toList();
     }
 }
+

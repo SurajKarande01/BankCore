@@ -82,12 +82,10 @@ class TransactionServiceTest {
                 .initiatedBy("alice_user")
                 .build();
 
-        when(accountRepository.findByAccountNumber("AC1000000001")).thenReturn(Optional.of(senderAccount));
-        when(accountRepository.findByAccountNumber("AC1000000002")).thenReturn(Optional.of(receiverAccount));
+        when(accountRepository.findIdByAccountNumber("AC1000000001")).thenReturn(Optional.of(1L));
+        when(accountRepository.findIdByAccountNumber("AC1000000002")).thenReturn(Optional.of(2L));
         when(accountRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(senderAccount));
         when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(receiverAccount));
-        when(accountRepository.findById(1L)).thenReturn(Optional.of(senderAccount));
-        when(accountRepository.findById(2L)).thenReturn(Optional.of(receiverAccount));
 
         when(transactionRepository.save(any(TransactionRecord.class))).thenAnswer(invocation -> {
             TransactionRecord txn = invocation.getArgument(0);
@@ -121,12 +119,10 @@ class TransactionServiceTest {
                 .initiatedBy("alice_user")
                 .build();
 
-        when(accountRepository.findByAccountNumber("AC1000000001")).thenReturn(Optional.of(senderAccount));
-        when(accountRepository.findByAccountNumber("AC1000000002")).thenReturn(Optional.of(receiverAccount));
+        when(accountRepository.findIdByAccountNumber("AC1000000001")).thenReturn(Optional.of(1L));
+        when(accountRepository.findIdByAccountNumber("AC1000000002")).thenReturn(Optional.of(2L));
         when(accountRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(senderAccount));
         when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(receiverAccount));
-        when(accountRepository.findById(1L)).thenReturn(Optional.of(senderAccount));
-        when(accountRepository.findById(2L)).thenReturn(Optional.of(receiverAccount));
 
         InsufficientBalanceException ex = assertThrows(InsufficientBalanceException.class, () ->
                 transactionService.transferFunds(request)
@@ -169,12 +165,10 @@ class TransactionServiceTest {
                 .initiatedBy("alice_user")
                 .build();
 
-        when(accountRepository.findByAccountNumber("AC1000000001")).thenReturn(Optional.of(senderAccount));
-        when(accountRepository.findByAccountNumber("AC1000000002")).thenReturn(Optional.of(receiverAccount));
+        when(accountRepository.findIdByAccountNumber("AC1000000001")).thenReturn(Optional.of(1L));
+        when(accountRepository.findIdByAccountNumber("AC1000000002")).thenReturn(Optional.of(2L));
         when(accountRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(senderAccount));
         when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(receiverAccount));
-        when(accountRepository.findById(1L)).thenReturn(Optional.of(senderAccount));
-        when(accountRepository.findById(2L)).thenReturn(Optional.of(receiverAccount));
 
         AccountInactiveException ex = assertThrows(AccountInactiveException.class, () ->
                 transactionService.transferFunds(request)

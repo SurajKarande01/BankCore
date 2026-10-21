@@ -26,6 +26,9 @@ public class AccountResponse {
     private LocalDateTime updatedAt;
 
     public static AccountResponse fromEntity(Account account) {
+        if (account == null) {
+            return null;
+        }
         return AccountResponse.builder()
                 .id(account.getId())
                 .accountNumber(account.getAccountNumber())

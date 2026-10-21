@@ -22,6 +22,9 @@ public class AuditLogResponse {
     private LocalDateTime timestamp;
 
     public static AuditLogResponse fromEntity(AuditLog audit) {
+        if (audit == null) {
+            return null;
+        }
         return AuditLogResponse.builder()
                 .id(audit.getId())
                 .entityName(audit.getEntityName())

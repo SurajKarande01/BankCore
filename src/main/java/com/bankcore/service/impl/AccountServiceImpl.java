@@ -38,18 +38,29 @@ public class AccountServiceImpl implements AccountService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AccountResponse createAccount(CreateAccountRequest request) {
-        if (accountRepository.existsByEmail(request.getEmail())) {
-            throw new InvalidTransactionException("An account already exists with email: " + request.getEmail());
+        if (request == null) {
+            throw new InvalidTransactionException("Account request cannot be null");
+        }
+
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        if (email.isEmpty()) {
+            throw new InvalidTransactionException("Email is required");
+        }
+
+        if (accountRepository.existsByEmail(email)) {
+            throw new InvalidTransactionException("An account already exists with email: " + email);
         }
 
         String accountNumber = generateUniqueAccountNumber();
         BigDecimal initialBalance = request.getInitialDeposit() != null ? request.getInitialDeposit() : BigDecimal.ZERO;
+        String holderName = request.getAccountHolderName() != null ? request.getAccountHolderName().trim() : "";
+        String phone = request.getPhoneNumber() != null ? request.getPhoneNumber().trim() : "";
 
         Account account = Account.builder()
                 .accountNumber(accountNumber)
-                .accountHolderName(request.getAccountHolderName().trim())
-                .email(request.getEmail().trim().toLowerCase())
-                .phoneNumber(request.getPhoneNumber().trim())
+                .accountHolderName(holderName)
+                .email(email)
+                .phoneNumber(phone)
                 .accountType(request.getAccountType())
                 .status(AccountStatus.ACTIVE)
                 .balance(initialBalance)
@@ -59,10 +70,11 @@ public class AccountServiceImpl implements AccountService {
 
         Account savedAccount = accountRepository.save(account);
 
-        // If there was an initial deposit > 0, record a transaction
+        // Record opening balance in transactions ledger if funded
         if (initialBalance.compareTo(BigDecimal.ZERO) > 0) {
+            String initialTxnRef = "TXN-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
             TransactionRecord initialTxn = TransactionRecord.builder()
-                    .transactionReference("TXN-" + UUID.randomUUID().toString().substring(0, 12).toUpperCase())
+                    .transactionReference(initialTxnRef)
                     .destinationAccountId(savedAccount.getId())
                     .destinationAccountNumber(savedAccount.getAccountNumber())
                     .amount(initialBalance)
@@ -76,7 +88,6 @@ public class AccountServiceImpl implements AccountService {
             transactionRepository.save(initialTxn);
         }
 
-        // Write immutable audit log
         auditService.log(
                 "ACCOUNT",
                 savedAccount.getId(),
@@ -95,14 +106,21 @@ public class AccountServiceImpl implements AccountService {
     @Override
     @Transactional(readOnly = true)
     public AccountResponse getAccountByNumber(String accountNumber) {
-        Account account = accountRepository.findByAccountNumber(accountNumber)
-                .orElseThrow(() -> AccountNotFoundException.forAccountNumber(accountNumber));
+        if (accountNumber == null || accountNumber.trim().isEmpty()) {
+            throw new InvalidTransactionException("Account number is required");
+        }
+        String cleanAccNum = accountNumber.trim();
+        Account account = accountRepository.findByAccountNumber(cleanAccNum)
+                .orElseThrow(() -> AccountNotFoundException.forAccountNumber(cleanAccNum));
         return AccountResponse.fromEntity(account);
     }
 
     @Override
     @Transactional(readOnly = true)
     public AccountResponse getAccountById(Long id) {
+        if (id == null) {
+            throw new InvalidTransactionException("Account ID is required");
+        }
         Account account = accountRepository.findById(id)
                 .orElseThrow(() -> AccountNotFoundException.forId(id));
         return AccountResponse.fromEntity(account);
@@ -114,12 +132,17 @@ public class AccountServiceImpl implements AccountService {
         return accountRepository.findAll(pageable).map(AccountResponse::fromEntity);
     }
 
+    // Generate unique account number with bounded attempts to guarantee termination
     private String generateUniqueAccountNumber() {
-        String accountNumber;
-        do {
-            long number = 1000000000L + (long) (secureRandom.nextDouble() * 9000000000L);
-            accountNumber = "AC" + number;
-        } while (accountRepository.existsByAccountNumber(accountNumber));
-        return accountNumber;
+        int maxAttempts = 15;
+        for (int attempt = 0; attempt < maxAttempts; attempt++) {
+            long number = 1000000000L + (Math.abs(secureRandom.nextLong()) % 9000000000L);
+            String candidate = "AC" + number;
+            if (!accountRepository.existsByAccountNumber(candidate)) {
+                return candidate;
+            }
+        }
+        return "AC" + (System.currentTimeMillis() % 10000000000L);
     }
 }
+

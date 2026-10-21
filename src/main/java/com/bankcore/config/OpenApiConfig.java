@@ -15,9 +15,7 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("BankCore API -- Banking Transaction & Account Ledger Engine")
-                        .description("High-performance backend banking transaction engine featuring ACID-compliant fund transfers, " +
-                                     "pessimistic locking concurrency protection, double-entry ledger bookkeeping, immutable audit trails, " +
-                                     "and monthly statement generation.")
+                        .description("Backend banking transaction engine with ACID transfers, pessimistic locking, audit trail, and statements.")
                         .version("1.0.0")
                         .contact(new Contact()
                                 .name("Suraj Daryappa Karande")
@@ -28,3 +26,4 @@ public class OpenApiConfig {
                                 .url("https://www.apache.org/licenses/LICENSE-2.0")));
     }
 }
+

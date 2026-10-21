@@ -74,10 +74,7 @@ public class Account {
         this.updatedAt = LocalDateTime.now();
     }
 
-    /**
-     * Deducts funds atomically from balance.
-     * Throws InsufficientBalanceException if debit exceeds current balance.
-     */
+    // Deduct funds and verify sufficient balance
     public void debit(BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Debit amount must be strictly positive");
@@ -91,9 +88,7 @@ public class Account {
         this.balance = this.balance.subtract(amount);
     }
 
-    /**
-     * Credits funds atomically to balance.
-     */
+    // Add funds to balance
     public void credit(BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Credit amount must be strictly positive");

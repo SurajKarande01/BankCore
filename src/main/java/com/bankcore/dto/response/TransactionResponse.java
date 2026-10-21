@@ -27,6 +27,9 @@ public class TransactionResponse {
     private LocalDateTime timestamp;
 
     public static TransactionResponse fromEntity(TransactionRecord txn) {
+        if (txn == null) {
+            return null;
+        }
         return TransactionResponse.builder()
                 .transactionReference(txn.getTransactionReference())
                 .sourceAccountNumber(txn.getSourceAccountNumber())

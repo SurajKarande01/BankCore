@@ -15,23 +15,21 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
 
     Optional<Account> findByAccountNumber(String accountNumber);
 
+    @Query("SELECT a.id FROM Account a WHERE a.accountNumber = :accountNumber")
+    Optional<Long> findIdByAccountNumber(@Param("accountNumber") String accountNumber);
+
     Optional<Account> findByEmail(String email);
 
     boolean existsByAccountNumber(String accountNumber);
 
     boolean existsByEmail(String email);
 
-    /**
-     * Acquires a row-level PESSIMISTIC_WRITE lock on the account record using SQL 'SELECT ... FOR UPDATE'.
-     * Prevents race conditions and lost updates during concurrent transfer/withdrawal requests.
-     */
+    // Pessimistic write lock for balance modifications
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Account a WHERE a.id = :id")
     Optional<Account> findByIdForUpdate(@Param("id") Long id);
 
-    /**
-     * Acquires a row-level PESSIMISTIC_WRITE lock on the account record using account number.
-     */
+    // Pessimistic write lock by account number
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Account a WHERE a.accountNumber = :accountNumber")
     Optional<Account> findByAccountNumberForUpdate(@Param("accountNumber") String accountNumber);

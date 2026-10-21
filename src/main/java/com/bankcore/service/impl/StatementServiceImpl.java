@@ -31,6 +31,9 @@ public class StatementServiceImpl implements StatementService {
     @Override
     @Transactional(readOnly = true)
     public MonthlyStatementResponse generateMonthlyStatement(String accountNumber, int year, int month) {
+        if (accountNumber == null || accountNumber.trim().isEmpty()) {
+            throw new InvalidTransactionException("Account number is required");
+        }
         if (month < 1 || month > 12) {
             throw new InvalidTransactionException("Month must be between 1 and 12");
         }
@@ -38,8 +41,9 @@ public class StatementServiceImpl implements StatementService {
             throw new InvalidTransactionException("Year must be a valid calendar year");
         }
 
-        Account account = accountRepository.findByAccountNumber(accountNumber)
-                .orElseThrow(() -> AccountNotFoundException.forAccountNumber(accountNumber));
+        String cleanAccNum = accountNumber.trim();
+        Account account = accountRepository.findByAccountNumber(cleanAccNum)
+                .orElseThrow(() -> AccountNotFoundException.forAccountNumber(cleanAccNum));
 
         YearMonth yearMonth = YearMonth.of(year, month);
         LocalDateTime startOfMonth = yearMonth.atDay(1).atStartOfDay();
@@ -55,6 +59,7 @@ public class StatementServiceImpl implements StatementService {
 
         BigDecimal openingBalance = BigDecimal.ZERO;
 
+        // Calculate opening balance from the earliest transaction of the month, or fallback to current balance
         if (!periodTxns.isEmpty()) {
             TransactionRecord firstTxn = periodTxns.get(0);
             boolean isFirstDebit = account.getId().equals(firstTxn.getSourceAccountId());
@@ -68,7 +73,7 @@ public class StatementServiceImpl implements StatementService {
                         : account.getBalance();
             }
         } else {
-            // No transactions in the period; opening and closing balance are the current balance
+            // No activity in this month, opening and closing balances are current balance
             openingBalance = account.getBalance();
         }
 
@@ -96,7 +101,7 @@ public class StatementServiceImpl implements StatementService {
         BigDecimal closingBalance = openingBalance.add(totalCredits).subtract(totalDebits);
 
         log.info("Generated statement for account {} (Month: {}/{}) - Opening: {}, Debits: {}, Credits: {}, Closing: {}",
-                accountNumber, month, year, openingBalance, totalDebits, totalCredits, closingBalance);
+                cleanAccNum, month, year, openingBalance, totalDebits, totalCredits, closingBalance);
 
         return MonthlyStatementResponse.builder()
                 .accountNumber(account.getAccountNumber())
@@ -113,3 +118,4 @@ public class StatementServiceImpl implements StatementService {
                 .build();
     }
 }
+

@@ -88,25 +88,27 @@ class BankCoreConcurrencyTest {
             });
         }
 
-        // Fire all 10 threads at the exact same instant
-        startLatch.countDown();
-        boolean completed = finishLatch.await(30, TimeUnit.SECONDS);
-        executor.shutdown();
+        try {
+            // Fire all 10 threads at the exact same instant
+            startLatch.countDown();
+            boolean completed = finishLatch.await(30, TimeUnit.SECONDS);
+            assertTrue(completed, "All concurrent transfer threads must complete within timeout");
+            assertEquals(10, successfulTransfers.get(), "All 10 transfers should succeed with sufficient balance");
+            assertEquals(0, failedTransfers.get(), "No transfers should fail or throw unexpected exceptions");
 
-        assertTrue(completed, "All concurrent transfer threads must complete within timeout");
-        assertEquals(10, successfulTransfers.get(), "All 10 transfers should succeed with sufficient balance");
-        assertEquals(0, failedTransfers.get(), "No transfers should fail or throw unexpected exceptions");
+            // Verify mathematical balances after concurrency
+            AccountResponse updatedSender = accountService.getAccountByNumber(sender.getAccountNumber());
+            AccountResponse updatedReceiver = accountService.getAccountByNumber(receiver.getAccountNumber());
 
-        // Verify mathematical balances after concurrency
-        AccountResponse updatedSender = accountService.getAccountByNumber(sender.getAccountNumber());
-        AccountResponse updatedReceiver = accountService.getAccountByNumber(receiver.getAccountNumber());
+            // Sender started with 1000, 10 * 50 = 500 transferred => 500 remaining
+            assertEquals(new BigDecimal("500.00"), updatedSender.getBalance(),
+                    "Sender balance must exactly equal 500.00 with zero lost updates");
 
-        // Sender started with 1000, 10 * 50 = 500 transferred => 500 remaining
-        assertEquals(new BigDecimal("500.00"), updatedSender.getBalance(),
-                "Sender balance must exactly equal 500.00 with zero lost updates");
-
-        // Receiver started with 0, received 500 => 500 total
-        assertEquals(new BigDecimal("500.00"), updatedReceiver.getBalance(),
-                "Receiver balance must exactly equal 500.00 with zero lost updates");
+            // Receiver started with 0, received 500 => 500 total
+            assertEquals(new BigDecimal("500.00"), updatedReceiver.getBalance(),
+                    "Receiver balance must exactly equal 500.00 with zero lost updates");
+        } finally {
+            executor.shutdownNow();
+        }
     }
 }
